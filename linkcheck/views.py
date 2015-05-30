@@ -1,22 +1,19 @@
-from django.views.decorators.csrf import csrf_exempt
-
+import json
 from itertools import groupby
 from operator import itemgetter
 
-try:
-    import simplejson
-except:
-    from django.utils import simplejson
+from django import forms
+from django.conf import settings
+from django.contrib.admin.templatetags.admin_static import static
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.contenttypes.models import ContentType
 from django.core.paginator import Paginator
 from django.core.urlresolvers import reverse
+from django.db import models
 from django.http import HttpResponse
 from django.shortcuts import render_to_response
 from django.template import RequestContext
-from django import forms
-from django.conf import settings
-from django.db import models
+from django.views.decorators.csrf import csrf_exempt
 
 from linkcheck.linkcheck_settings import RESULTS_PER_PAGE
 from linkcheck.models import Link
@@ -55,8 +52,8 @@ def report(request):
             link.ignore = True
             link.save()
             if request.is_ajax():
-                json = simplejson.dumps({'link': ignore_link_id})
-                return HttpResponse(json, mimetype='application/javascript')
+                json_data = json.dumps({'link': ignore_link_id})
+                return HttpResponse(json_data, content_type='application/javascript')
         
         unignore_link_id = request.GET.get('unignore', None)
         if unignore_link_id != None:
@@ -64,22 +61,22 @@ def report(request):
             link.ignore = False
             link.save()
             if request.is_ajax():
-                json = simplejson.dumps({'link': unignore_link_id})
-                return HttpResponse(json, mimetype='application/javascript')
+                json_data = json.dumps({'link': unignore_link_id})
+                return HttpResponse(json_data, content_type='application/javascript')
             
         recheck_link_id = request.GET.get('recheck', None)
         if recheck_link_id != None:
             link = Link.objects.get(id=recheck_link_id)
             url = link.url 
-            url.check(external_recheck_interval=0)
+            url.check_url(external_recheck_interval=0)
             links = [x[0] for x in url.links.values_list('id')]
             if request.is_ajax():
-                json = simplejson.dumps({
+                json_data = json.dumps({
                     'links': links,
                     'message': url.message,
                     'colour': url.colour,
                 })
-                return HttpResponse(json, mimetype='application/javascript')
+                return HttpResponse(json_data, content_type='application/javascript')
 
     link_filter = request.GET.get('filters', 'show_invalid')
 
@@ -145,7 +142,7 @@ def report(request):
             {'content_types_list': content_types_list,
             'pages': links,
             'filter': link_filter,
-            'media':  forms.Media(js=['%s%s' % (admin_static, 'js/jquery.min.js')]),
+            'media':  forms.Media(js=[static('admin/js/jquery.min.js')]),
             'qry_data': rqst.urlencode(),
             'report_type': report_type,
             'ignored_count': Link.objects.filter(ignore=True).count(),
